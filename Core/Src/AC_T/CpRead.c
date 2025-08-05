@@ -103,7 +103,7 @@ void ProcessEvseCpADC(uint16_t *samples, uint16_t len)
  * 1:state A, 2:State B1, 3:State B2, 4:State C, 5:State D, 6:State E, 7:State F, 8: Pilot error, // same as Zerova logs
  *
  * TODO:
- * 		Add on states: 9: Unplug CP without going to state B2 first +6V, 10: State C2 (go from A to C skipping B) +-12V
+ * 		Add on states: 9: Unplug CP without going to state B2 first +6V, 10: State C2 (go from A to C skipping B or C to B) +-12V
  *
  *
  * Determines J-1772 state with adc data (+-1v or more inaccuarcy, especailly at low voltage

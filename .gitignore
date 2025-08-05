@@ -1,0 +1,14 @@
+# STM32CubeIDE build output
+/Debug/
+/Release/
+/build/
+/*.bin
+/*.elf
+/*.hex
+*.log
+*.swp
+
+# CubeIDE metadata
+.cproject
+.mxproject
+.settings/
