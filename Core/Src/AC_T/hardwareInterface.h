@@ -11,8 +11,7 @@
  */
 extern TIM_HandleTypeDef htim2; //1 Mhz counter, 65.6ms overflow
 
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim);
-uint32_t micros();
+uint16_t micros();
 
 
 /*
@@ -43,7 +42,7 @@ extern I2C_HandleTypeDef hi2c1;
 
 void MCP4725_DP_DN_init(void);
 void MCP4725_DP_DN_setValue(uint16_t value);
-
+void MCP4725_DP_DN_setVoltage(float voltage);
 
 /*
  * J-1772 Relay and MOSFET Controls

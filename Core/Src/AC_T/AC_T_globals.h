@@ -1,12 +1,13 @@
 
 /* global include file, which includes all other include files */
 
-
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
 #include "main.h"
 #include "usbd_cdc_if.h"
+#include "usb_device.h"
 
 #include "myHelpers.h"
 #include "ADS1220.h"

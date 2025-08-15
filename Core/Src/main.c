@@ -24,7 +24,7 @@
 /* USER CODE BEGIN Includes */
 
 
-#include "usbd_cdc_if.h"
+
 
 #include "AC_T_globals.h"
 
@@ -119,6 +119,7 @@ int main(void)
   MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
+  USB_Reenumerate();
 
   hardwareInterfaceInit();
   AdcInit();

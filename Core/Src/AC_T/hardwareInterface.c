@@ -5,24 +5,10 @@
 #include "AC_T_globals.h"
 
 
-volatile uint32_t _microsHigh = 0;
-
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-    if (htim->Instance == TIM2) {
-        _microsHigh++;
-    }
+uint16_t micros() {
+	return __HAL_TIM_GET_COUNTER(&htim2);
 }
 
-uint32_t micros() {
-    uint32_t high1, low, high2;
-    do {
-        high1 = _microsHigh;
-        low = __HAL_TIM_GET_COUNTER(&htim2);
-        high2 = _microsHigh;
-    } while (high1 != high2);  // avoid race condition
-
-    return (high1 << 16) | low;
-}
 
 /*
  * ADS1220 higher level stuff
@@ -52,7 +38,7 @@ void EXTI15_10_IRQHandler(void)
         __HAL_GPIO_EXTI_CLEAR_IT(DRDY_PIN);
         HAL_NVIC_DisableIRQ(DRDY_IRQ_CH);
 
-
+        uint16_t sampleTime = micros();
         int32_t result = ADS1220_read_after_DRDYM(&hspi1);
 
 		if (ADS1220_new_data_CH == 0)
@@ -62,14 +48,14 @@ void EXTI15_10_IRQHandler(void)
 				ADS1220_switch_CH_V_I(&hspi1, 1); //switch to I ch
 				ADS1220_new_data_CH = 1;
 			}
-			new_ADS_AC_V_sample(result);
+			new_ADS_AC_V_sample(result, sampleTime);
 		}
 		else
 		{
 			ADS1220_switch_CH_V_I(&hspi1, 0); // always switch back to primary CH (V)
 			ADS1220_new_data_CH = 0;
 
-			new_ADS_AC_I_sample(result);
+			new_ADS_AC_I_sample(result, sampleTime);
 		}
 
         __HAL_GPIO_EXTI_CLEAR_IT(DRDY_PIN); //Clear EXTI pending flag which catches the spi comms (still monitors when disabled)
@@ -86,7 +72,7 @@ static MCP4725 myMCP4725; // static so only in this file's scope
 
 void MCP4725_DP_DN_init(void)
 {
-	myMCP4725 = MCP4725_init(&hi2c1, MCP4725A0_ADDR_A00, 3.30); // DP DN, A01 is D1
+	myMCP4725 = MCP4725_init(&hi2c1, MCP4725A0_ADDR_A00, 3.30f); // DP DN, A01 is D1
 
 
 	uint16_t eeprom_val = MCP4725_readRegister(&myMCP4725, MCP4725_READ_EEPROM); // update eeprom to 0 current if not already set
@@ -102,6 +88,11 @@ void MCP4725_DP_DN_init(void)
 void MCP4725_DP_DN_setValue(uint16_t value)
 {
 	MCP4725_setValue(&myMCP4725, value, MCP4725_FAST_MODE, MCP4725_POWER_DOWN_OFF);
+}
+
+void MCP4725_DP_DN_setVoltage(float voltage)
+{
+	MCP4725_setVoltage(&myMCP4725, voltage, MCP4725_FAST_MODE, MCP4725_POWER_DOWN_OFF);
 }
 
 

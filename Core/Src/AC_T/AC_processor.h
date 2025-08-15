@@ -10,46 +10,49 @@
 
 #include "AC_T_globals.h"
 
+uint8_t update_CT_mA_setpoint(int32_t new_mA_setpoint);
+uint8_t update_CT_phase_us_offset(int32_t new_CT_phase_us_offset); // may need to add limits, positive for leading current
+uint8_t update_Sense_Mode(uint8_t new_sense_mode); // 1 for sense mode (read 2ch), 0 for emulate mode, also resets energy register
 
-// #define AC_PROCESS_INTERVAL 100 // MS
-#define NUM_CYCLES 10 // number of AC V cycles that is processed at a time (60Hz = 167.7ms, 322samples 1ch, 146samples 2ch)
+// 30 cycles = 500ms, can reduce to increase data update frequency, but more fluctuations / noise. Min is 3
+#define NUM_CYCLES 30 // number of AC V cycles that is processed at a time (10 cycles 60Hz = 167.7ms, 322samples 1ch, 146samples 2ch)
 #define NUM_ZC (NUM_CYCLES) // after seeing NUM_ZC it will have NUM_CYCLES in buf
 
-#define AC_BUFFER_SIZE 512 // enough for 265ms 1ch, >500ms 2ch
-
-// #define ZC_INDEX_BUFFER_SIZE 32
+#define AC_BUFFER_SIZE 1024 // 512 is enough for 265ms 1ch, >500ms 2ch
 
 
 
-void new_ADS_AC_V_sample(int32_t sample);
-void new_ADS_AC_I_sample(int32_t sample);
+
+void new_ADS_AC_V_sample(int32_t sample, uint16_t sampleTime);
+void new_ADS_AC_I_sample(int32_t sample, uint16_t sampleTime);
 
 
 
 typedef struct {
-    int32_t Vrms;
-    int32_t Irms;
-    int64_t RealPower;
-    int64_t ApparentPower;
+    float Vrms; // volts
+    float Irms; // amps
+    float RealPower_W;
+    float ApparentPower_W;
 
-    int64_t Vsq_sum;
-    int64_t Isq_sum;
+    float VrmsRaw;
+    uint64_t Vsq_sum_raw;
+    uint64_t Isq_sum_raw;
+
     uint16_t SampleNum;
     uint32_t Duration_us;
 
-    int32_t PF_x1000;
-    int32_t PhaseAngle_deg_x10;
-    uint32_t Frequency_Hz_x100;
-} AC_Results_t;
-// raw values
-extern AC_Results_t cur_AC_data;
+    float PF;
+    float Frequency_Hz;
+
+    float avgSampleTime;
+    uint8_t zc_count;
+} AC_Results_float;
+
+extern volatile AC_Results_float cur_AC_data;
+
+extern volatile float AC_EnergyRegister_Wh;
 
 
-extern volatile int64_t AC_EnergyRegister_uWh;
-
-extern volatile int64_t AC_PowerReal_uW;
-extern volatile int32_t AC_Vrms_mV;
-extern volatile int32_t AC_Irms_mA;
 
 
 

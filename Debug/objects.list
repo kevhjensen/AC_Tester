@@ -1,6 +1,5 @@
 "./Core/Src/AC_T/AC_Tester_Modes.o"
 "./Core/Src/AC_T/AC_processor.o"
-"./Core/Src/AC_T/AC_processorV2.o"
 "./Core/Src/AC_T/ADS1220.o"
 "./Core/Src/AC_T/CpRead.o"
 "./Core/Src/AC_T/EV_StateMachine.o"

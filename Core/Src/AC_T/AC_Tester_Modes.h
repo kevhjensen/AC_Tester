@@ -1,4 +1,8 @@
-
+/*
+ * USB CDC interface, open up a serial port to control and read data
+ *
+ *
+ */
 
 
 
@@ -17,7 +21,7 @@ extern volatile uint8_t printSamples;
 
 
 int ParseUSBCommand(char *line);
-
+void USB_Reenumerate(void);
 
 
 #endif /* SRC_AC_T_AC_TESTER_MODES_H_ */

@@ -56,35 +56,6 @@ volatile uint8_t data_mode = 0;
 
 void set_data_mode(uint16_t mode)
 {
-	printSamples = 0;
-	switch (mode) {
-	case 0:
-		ADS1220_read_both_CHs = 0;
-		break;
-	case 1:
-		ADS1220_read_both_CHs = 0;
-		break;
-	case 2:
-		ADS1220_read_both_CHs = 1;
-		break;
-	case 11:
-		ADS1220_read_both_CHs = 0;
-		printSamples = 1;
-		break;
-	case 12:
-		ADS1220_read_both_CHs = 1;
-		printSamples = 1;
-		break;
-	case 21:
-		ADS1220_read_both_CHs = 0;
-		break;
-	case 22:
-		ADS1220_read_both_CHs = 1;
-		break;
-//	default:
-//		invalidCMD();
-//		return;
-	}
 	data_mode = mode;
 	validRespondUint("data_mode", mode);
 }
@@ -122,18 +93,50 @@ int ParseUSBCommand(char *line)
 
     if ((strcmp(key, "data_mode") == 0) || (strcmp(key, "dm") == 0))
         set_data_mode(value);
-    else if (strcmp(key, "std_data_interval") == 0)
-        ;//set_std_data_interval(atoi(value));
+    else if (strcmp(key, "ct") == 0)
+    	update_charger_type(value);
     else if ((strcmp(key, "manual_cp") == 0) || (strcmp(key, "cp") == 0))
         set_manual_cp(value);
-    else if (strcmp(key, "veh_state") == 0)
-        ; // implement as needed
-    else if (strcmp(key, "veh_max_amps") == 0)
-        ; // implement as needed
+    else if (strcmp(key, "ma") == 0)
+    	update_CT_mA_setpoint(value*1000);
+    else if (strcmp(key, "sm") == 0)
+    	update_Sense_Mode(value);
     else if (strcmp(key, "veh_prof") == 0)
         ; // etc.
     else
         return -2; // unknown command
 
     return 0;
+}
+
+void USB_Reenumerate(void)
+{
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // Disable USB peripheral
+    __HAL_RCC_USB_CLK_DISABLE();
+
+    // Take control of PA12 as GPIO
+    GPIO_InitStruct.Pin = GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Pull D+ low
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
+
+    // Wait long enough for host to detect disconnect
+    HAL_Delay(50);
+
+    // Return PA12 to USB (Alternate Function Push Pull)
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Re-enable USB peripheral
+    __HAL_RCC_USB_CLK_ENABLE();
+
+    // Re-init USB device
+    MX_USB_DEVICE_Init();
 }

@@ -102,14 +102,15 @@ void ProcessEvseCpADC(uint16_t *samples, uint16_t len)
 /*
  * 1:state A, 2:State B1, 3:State B2, 4:State C, 5:State D, 6:State E, 7:State F, 8: Pilot error, // same as Zerova logs
  *
- * TODO:
- * 		Add on states: 9: Unplug CP without going to state B2 first +6V, 10: State C2 (go from A to C skipping B or C to B) +-12V
+ * Add on states:
+ * 9: State C1 (6v no pwm) vehicle should never be in this state
+ * 10: State A2 (12v high pwm) Unplug from state C, will be a very brief period of state 10
  *
  *
  * Determines J-1772 state with adc data (+-1v or more inaccuarcy, especailly at low voltage
  * 0.5V extra range on each end compared to J-1772 (+-1 V range)
  *
- * No PWM (frequency <100hz or dc<3% or > 97%)
+ * No PWM (frequency <100hz)
  * 	A: low>=1050 high<1350
  * 	B1 low>750 high < 1050
  * 	E > -250 <250
@@ -123,9 +124,11 @@ void ProcessEvseCpADC(uint16_t *samples, uint16_t len)
  * 	Frequency <900hz or >1100hz
  * 	Low V <-16V or >-8V
  *		DC < 3% or 7% < DC < 8% or DC > 97%
- * 	B2 high>=750 high<1100
- * 	C high >450 high<750
- * `D high >100 high < 400
+ *
+ *	Valid PWM states:
+ * 		B2 high>=750 high<1100
+ * 		C high >450 high<750
+ * 		D high >100 high < 400
  *
  * -1650 min of adc
  */
@@ -133,7 +136,7 @@ void ProcessEvseCpADC(uint16_t *samples, uint16_t len)
 uint8_t Get_EVSE_CP_State(void)
 {
     // No PWM detected (low frequency) or duty cycle at the edge
-    if (evse_cp_freq_x10 <= 1000 || evse_cp_duty_x100<300 || evse_cp_duty_x100>9700) {
+    if (evse_cp_freq_x10 <= 1000) {
         if (evse_cp_low_Vx100 >= 1050 && evse_cp_high_Vx100 < 1350)
             return 1; // State A
         else if (evse_cp_low_Vx100 > 750 && evse_cp_high_Vx100 < 1050)
@@ -142,6 +145,8 @@ uint8_t Get_EVSE_CP_State(void)
             return 6; // State E
         else if (evse_cp_low_Vx100 > -1600 && evse_cp_high_Vx100 < -1100)
             return 7; // State F
+        else if (evse_cp_low_Vx100 > 500 && evse_cp_high_Vx100 <= 750)
+            return 9; // State C1 9
         else
             return 8; // Pilot error
     }
@@ -152,8 +157,12 @@ uint8_t Get_EVSE_CP_State(void)
     	return 8;
     if (evse_cp_low_Vx100 < -1600 || evse_cp_low_Vx100 > -800)
     	return 8;
+
     if (evse_cp_duty_x100 > 700 && evse_cp_duty_x100 < 800)
     	return 8;
+    if (evse_cp_duty_x100<300 || evse_cp_duty_x100>9700)
+        	return 8;
+
 
 
     // valid PWM detected
@@ -163,6 +172,8 @@ uint8_t Get_EVSE_CP_State(void)
         return 4; // State C
     else if (evse_cp_high_Vx100 > 100 && evse_cp_high_Vx100 < 400)
         return 5; // State D
+    else if (evse_cp_high_Vx100 >= 1050)
+        return 10; // State 10 A2
 
     return 8; // Pilot error
 }
@@ -242,9 +253,9 @@ void processCpADCdata10ms(void)
 		updateEvseCpStateAndAmpLimit();
 		evse_cp_adc_ready = 0;
 
-		if (data_mode == 7) {
+		if (data_mode == 6 || data_mode == 7) {
 					snprintf(buf, sizeof(buf),
-							 "CP %lu, %li, %li, %lu, %lu, %u, %lu, %u\r\n",
+							 "CP %lu, %li, %li, %lu, %lu, %u, %u, %u\r\n",
 							 HAL_GetTick(),
 							 evse_cp_high_Vx100,   // High voltage (x100)
 							 evse_cp_low_Vx100,    // Low voltage (x100)

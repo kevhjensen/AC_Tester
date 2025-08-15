@@ -18,22 +18,6 @@ void addToTrace(char * s) {
 }
 
 
-uint32_t int_sqrt64(uint64_t x) {
-    uint64_t op = x;
-    uint64_t res = 0;
-    uint64_t one = 1ULL << 62;
-    while (one > op) one >>= 2;
-    while (one != 0) {
-        if (op >= res + one) {
-            op -= res + one;
-            res = (res >> 1) + one;
-        } else {
-            res >>= 1;
-        }
-        one >>= 2;
-    }
-    return (uint32_t)res;
-}
 
 
 // accurate
@@ -43,47 +27,95 @@ int32_t cp_V_x100_from_raw(uint16_t raw)
 }
 
 
-#define ADS_FULL_SCALE     8388608    // 2^23
-#define ADS_SCALE_FACTOR   512        // (2048 mV / Gain 4)
 
+#define ADS_RATIO_REAL_mV_TO_RAW 16384 // 2^23 / 512 (mV, gain 4), gives mV at ADS1220 input from its raw 24 signed int value
+// base 2 so can divide float fast
+
+#define AC_V_actual_mV_to_raw_mV_ratio    991       // actual AC mV = 991 * ADS1220 input mV for AC_T PCB
 #define AC_V_RESISTOR_RATIO    991       // actual AC mV = 991 * ADS1220 input mV for AC_T PCB
 
-uint32_t x1000_CT_ratio_divBy_burdenResistance = 320512; //ax80 206,954 ax48
+#define AC_I_raw_mV_per_actual_A_x1000_AX48 4832 // charger type 1
+#define AC_I_raw_mV_per_actual_A_x1000_AX80 3120 // 2
+#define AC_I_raw_mV_per_actual_A_x1000_AW32 4000 // update this
+
+volatile uint8_t charger_type = 1;
+volatile uint32_t AC_I_raw_mV_per_actual_A_x1000 = AC_I_raw_mV_per_actual_A_x1000_AX48;
+// CT_burdenResistance_divBy_CT_ratio_x1000000
+// actual AC I = ADS1220 input mV / 3120 for AC_T PCB
+
+// = 1000 * burdenResistance / (CT ratio / 1000) AX80 = 1000 * 7.8 / (2500 / 1000)
 
 
-// = (raw * 512 / 2^23) * 991  // first part gives mV
-int32_t AC_V_mV_from_raw(int32_t raw)
+
+float AC_V_from_raw(float raw)
 {
-    int64_t temp = (int64_t)raw * 512 * AC_V_RESISTOR_RATIO;
-
-    return (int32_t)((temp + (ADS_FULL_SCALE / 2)) / ((int64_t)ADS_FULL_SCALE)); // rounds
-} // ads max out 507,392 mV
-
-// = (raw * 512 / 2^23) * 2500 / 7.8 //CT ratio / resistance
-int32_t AC_I_mA_from_raw(int32_t raw)
+	return (raw * AC_V_actual_mV_to_raw_mV_ratio / ADS_RATIO_REAL_mV_TO_RAW) / 1000.0f;
+}
+float AC_I_from_raw(float raw)
 {
-    int64_t temp = (int64_t)raw * ADS_SCALE_FACTOR * x1000_CT_ratio_divBy_burdenResistance;
-
-    return (int32_t)((temp + (ADS_FULL_SCALE / 2)) / ((int64_t)ADS_FULL_SCALE * 1000));
-} // ads max out 164,102 mA
-
-int64_t AC_P_uW_from_raw(int64_t raw) //raw is 2 24bit multiplied = 7.037e13
-{
-    // Step 1: divide early to prevent oversized intermediate
-    int64_t scaled =  x1000_CT_ratio_divBy_burdenResistance * raw / ADS_FULL_SCALE;
-    scaled = (scaled* AC_V_RESISTOR_RATIO) / 1000; // max is 6.977e17, int64 max is 9.22e18
-    scaled = scaled * ADS_SCALE_FACTOR * ADS_SCALE_FACTOR / ADS_FULL_SCALE;
-
-    return scaled; // µW both V I at max ADS output is 83,168,462,396 (83.168kW), can be multiplied by 110,888,472 for int64
+	return (raw * 1000.0f / AC_I_raw_mV_per_actual_A_x1000) / ADS_RATIO_REAL_mV_TO_RAW;
 }
 
-// safe for max uW above and 500,000uS
-int64_t energy_uWh_from_uW_us(int64_t power_uW, int64_t time_us)
-{
-    // Multiply first; safe for inputs up to ~10^13 and ~10^6 respectively
-    int64_t energy_uWus = power_uW * time_us;
 
-    // Convert to µWh
-    return energy_uWus / 3600000000;
+float AC_I_raw_V_from_actual_A(float actual_A)
+{
+	return actual_A * AC_I_raw_mV_per_actual_A_x1000 / 1000000.0f;
 }
+
+uint16_t MCP_DP_DN_Value_from_A_setpoint(float A_setpoint)
+{
+	float output_diff_V = AC_I_raw_V_from_actual_A(A_setpoint);
+
+	float volts =  1.65f + 5.0f * (output_diff_V / 2.0f); // output is scaled down 5x via resistors, /2 since output doubled to make diff output
+
+	if (volts <= 0.0f)   return 0;
+	if (volts >= 3.3f)   return 4095;
+	return (uint16_t)((volts * (4095.0f / 3.3f)) + 0.5f); // half-up rounding
+}
+
+
+float actual_A_from_MCP_DP_DN_Value(uint16_t dac_value) // inverse of above function
+{
+    // Convert DAC code back to volts
+    float volts = ((float)dac_value * 3.3f) / 4095.0f;
+
+    float output_diff_V = ((volts - 1.65f) * 2.0f) / 5.0f;
+
+    // Reverse AC_I_raw_V_from_actual_A()
+    float A_setpoint = output_diff_V * (1000000.0f / AC_I_raw_mV_per_actual_A_x1000);
+
+    return A_setpoint;
+}
+
+
+uint8_t update_AC_I_raw_mV_per_actual_A_x1000(uint32_t new_conv_factor) // may need to add limits
+{
+	AC_I_raw_mV_per_actual_A_x1000 = new_conv_factor;
+	charger_type = 0;
+	return 1;
+}
+
+uint8_t update_charger_type(uint8_t new_ct)
+{
+	switch (new_ct) {
+	case 0:
+		break;
+	case 1:
+		AC_I_raw_mV_per_actual_A_x1000 = AC_I_raw_mV_per_actual_A_x1000_AX48;
+		break;
+	case 2:
+		AC_I_raw_mV_per_actual_A_x1000 = AC_I_raw_mV_per_actual_A_x1000_AX80;
+		break;
+	case 3:
+		AC_I_raw_mV_per_actual_A_x1000 = AC_I_raw_mV_per_actual_A_x1000_AW32;
+		break;
+	default:
+		return 0;
+	}
+	charger_type = new_ct;
+	return 1;
+}
+
+
+
 

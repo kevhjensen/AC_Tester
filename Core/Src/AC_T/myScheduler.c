@@ -59,7 +59,7 @@ void task1s(void) {
 	if (data_mode == 5) {
 				  snprintf(buf, sizeof(buf),
 						   "%lu, cp_H_L_D_F, %li, %li, %lu, %lu\r\n",
-						   micros(),
+						   HAL_GetTick(),
 						   cp_V_x100_from_raw(evse_cp_high),   // Raw ADC high value
 						   cp_V_x100_from_raw(evse_cp_low),             // Raw ADC low value
 						   evse_cp_duty_x100,       // Duty cycle ×100 (e.g., 8000 = 80.00%)
@@ -67,12 +67,12 @@ void task1s(void) {
 				  CDC_Transmit_FS((uint8_t*)buf, strlen(buf));
 			  }
 
-			  if (printSamples) {
-				  snprintf(buf, sizeof(buf), "SamplesPerSecond: %u, %u\r\n", V_numSamples, I_numSamples); // Convert int to string with newline
-				  CDC_Transmit_FS((uint8_t*)buf, strlen(buf));
-			  }
-			  V_numSamples = 0;
-			  I_numSamples = 0;
+	  if (data_mode == 11) {
+		  snprintf(buf, sizeof(buf), "SamplesPerSecond: %u, %u\r\n", V_numSamples, I_numSamples); // Convert int to string with newline
+		  CDC_Transmit_FS((uint8_t*)buf, strlen(buf));
+	  }
+	  V_numSamples = 0;
+	  I_numSamples = 0;
 
   uint8_t blStop=0;
   if (canary1!=0x55AA55AA) { //magic number, checks for stack overflow
