@@ -34,7 +34,7 @@ df_cp = pd.DataFrame(cp_lines, columns=[
     "Freq_x10",                # evse_cp_freq_x10
     "DebouncedState",          # evse_cp_debounce_read_state
     "CurrentLimit_x100",       # evse_cp_cur_amp_limit_x100
-    "isPLC"                    # isPLC (bool or int)
+    "evse_isPLC"                    # evse_isPLC (bool or int)
 ])
 
 # Show preview

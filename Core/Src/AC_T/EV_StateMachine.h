@@ -12,4 +12,25 @@
 
 
 
+
+// Call once at boot
+void EV_stateMachine_Init(void);
+
+// Call periodically (e.g., every 10–20 ms)
+void processEV_stateMachine10ms(void);
+
+
+
+extern volatile uint8_t isVehicleControlNotManual;
+
+// 0	idle / unplug
+// 1	plug_in and start charging
+// 2	plug_in and stop charging
+
+uint8_t update_vehicle_control(uint8_t new_vehicle_control);
+
+uint8_t update_vehicle_amp_limit(uint8_t new_vehicle_amp_limit);
+
+
+
 #endif /* SRC_AC_T_EV_STATEMACHINE_H_ */

@@ -17,10 +17,9 @@
 extern volatile uint16_t STDdataPeriodMS;
 
 extern volatile uint8_t data_mode;
-extern volatile uint8_t printSamples;
 
 
-int ParseUSBCommand(char *line);
+void ParseUSBCommand(char *line);
 void USB_Reenumerate(void);
 
 

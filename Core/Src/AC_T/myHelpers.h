@@ -9,16 +9,22 @@
 #define SRC_AC_T_MYHELPERS_H_
 
 
-#include <stdint.h>
+/*
+ * microsecond time
+ */
+extern TIM_HandleTypeDef htim2; //1 Mhz counter, 65.6ms overflow
 
-extern char strTmp[64];
+uint16_t micros();
+
 extern char buf[64]; //usb print buf
 
-void addToTrace(char * s);
 
 
+void addToMsgQ(const char * s);
 
-int32_t cp_V_x100_from_raw(uint16_t raw);
+
+int32_t ev_cp_V_x100_from_raw(uint16_t raw);
+int32_t evse_cp_V_x100_from_raw(uint16_t raw);
 
 
 float AC_V_from_raw(float raw);

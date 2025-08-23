@@ -3,6 +3,7 @@
 "./Core/Src/AC_T/ADS1220.o"
 "./Core/Src/AC_T/CpRead.o"
 "./Core/Src/AC_T/EV_StateMachine.o"
+"./Core/Src/AC_T/EV_StateMachine2.o"
 "./Core/Src/AC_T/MCP4725.o"
 "./Core/Src/AC_T/hardwareInterface.o"
 "./Core/Src/AC_T/myHelpers.o"

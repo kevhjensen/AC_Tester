@@ -6,12 +6,13 @@
 #define SRC_AC_T_HARDWAREINTERFACE_H_
 
 
-/*
- * microsecond time
- */
-extern TIM_HandleTypeDef htim2; //1 Mhz counter, 65.6ms overflow
+// AC voltage out detection
+extern volatile uint8_t isMoreThan60Vac_onChargerOut; // high if >60V AC 60Hz present on charger gun out, to double check if relays work
 
-uint16_t micros();
+#define MAINS_OUT_SENSE_PIN GPIO_PIN_1 // PB1 OPTO
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+
+void process_30ms_isMoreThan60Vac_onChargerOut(void);
 
 
 /*
@@ -42,7 +43,6 @@ extern I2C_HandleTypeDef hi2c1;
 
 void MCP4725_DP_DN_init(void);
 void MCP4725_DP_DN_setValue(uint16_t value);
-void MCP4725_DP_DN_setVoltage(float voltage);
 
 /*
  * J-1772 Relay and MOSFET Controls
@@ -70,9 +70,6 @@ typedef struct {
 extern const GpioPin cp_gpio_map[CP_NUM_GPIO];
 
 
-extern volatile uint8_t cp_cur_set_state;
-extern volatile uint8_t cp_new_set_state;
-
 
 
 typedef enum {
@@ -85,6 +82,7 @@ typedef enum {
     CP_DIODE_SHORT = 6
 } CP_Set_State;
 
+extern volatile uint8_t cp_cur_set_state;
 uint8_t set_cp_state(uint8_t new_state);
 
 void hardwareInterfaceInit(void);

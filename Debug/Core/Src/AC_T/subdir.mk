@@ -10,6 +10,7 @@ C_SRCS += \
 ../Core/Src/AC_T/ADS1220.c \
 ../Core/Src/AC_T/CpRead.c \
 ../Core/Src/AC_T/EV_StateMachine.c \
+../Core/Src/AC_T/EV_StateMachine2.c \
 ../Core/Src/AC_T/MCP4725.c \
 ../Core/Src/AC_T/hardwareInterface.c \
 ../Core/Src/AC_T/myHelpers.c \
@@ -21,6 +22,7 @@ OBJS += \
 ./Core/Src/AC_T/ADS1220.o \
 ./Core/Src/AC_T/CpRead.o \
 ./Core/Src/AC_T/EV_StateMachine.o \
+./Core/Src/AC_T/EV_StateMachine2.o \
 ./Core/Src/AC_T/MCP4725.o \
 ./Core/Src/AC_T/hardwareInterface.o \
 ./Core/Src/AC_T/myHelpers.o \
@@ -32,6 +34,7 @@ C_DEPS += \
 ./Core/Src/AC_T/ADS1220.d \
 ./Core/Src/AC_T/CpRead.d \
 ./Core/Src/AC_T/EV_StateMachine.d \
+./Core/Src/AC_T/EV_StateMachine2.d \
 ./Core/Src/AC_T/MCP4725.d \
 ./Core/Src/AC_T/hardwareInterface.d \
 ./Core/Src/AC_T/myHelpers.d \
@@ -45,7 +48,7 @@ Core/Src/AC_T/%.o Core/Src/AC_T/%.su Core/Src/AC_T/%.cyclo: ../Core/Src/AC_T/%.c
 clean: clean-Core-2f-Src-2f-AC_T
 
 clean-Core-2f-Src-2f-AC_T:
-	-$(RM) ./Core/Src/AC_T/AC_Tester_Modes.cyclo ./Core/Src/AC_T/AC_Tester_Modes.d ./Core/Src/AC_T/AC_Tester_Modes.o ./Core/Src/AC_T/AC_Tester_Modes.su ./Core/Src/AC_T/AC_processor.cyclo ./Core/Src/AC_T/AC_processor.d ./Core/Src/AC_T/AC_processor.o ./Core/Src/AC_T/AC_processor.su ./Core/Src/AC_T/ADS1220.cyclo ./Core/Src/AC_T/ADS1220.d ./Core/Src/AC_T/ADS1220.o ./Core/Src/AC_T/ADS1220.su ./Core/Src/AC_T/CpRead.cyclo ./Core/Src/AC_T/CpRead.d ./Core/Src/AC_T/CpRead.o ./Core/Src/AC_T/CpRead.su ./Core/Src/AC_T/EV_StateMachine.cyclo ./Core/Src/AC_T/EV_StateMachine.d ./Core/Src/AC_T/EV_StateMachine.o ./Core/Src/AC_T/EV_StateMachine.su ./Core/Src/AC_T/MCP4725.cyclo ./Core/Src/AC_T/MCP4725.d ./Core/Src/AC_T/MCP4725.o ./Core/Src/AC_T/MCP4725.su ./Core/Src/AC_T/hardwareInterface.cyclo ./Core/Src/AC_T/hardwareInterface.d ./Core/Src/AC_T/hardwareInterface.o ./Core/Src/AC_T/hardwareInterface.su ./Core/Src/AC_T/myHelpers.cyclo ./Core/Src/AC_T/myHelpers.d ./Core/Src/AC_T/myHelpers.o ./Core/Src/AC_T/myHelpers.su ./Core/Src/AC_T/myScheduler.cyclo ./Core/Src/AC_T/myScheduler.d ./Core/Src/AC_T/myScheduler.o ./Core/Src/AC_T/myScheduler.su
+	-$(RM) ./Core/Src/AC_T/AC_Tester_Modes.cyclo ./Core/Src/AC_T/AC_Tester_Modes.d ./Core/Src/AC_T/AC_Tester_Modes.o ./Core/Src/AC_T/AC_Tester_Modes.su ./Core/Src/AC_T/AC_processor.cyclo ./Core/Src/AC_T/AC_processor.d ./Core/Src/AC_T/AC_processor.o ./Core/Src/AC_T/AC_processor.su ./Core/Src/AC_T/ADS1220.cyclo ./Core/Src/AC_T/ADS1220.d ./Core/Src/AC_T/ADS1220.o ./Core/Src/AC_T/ADS1220.su ./Core/Src/AC_T/CpRead.cyclo ./Core/Src/AC_T/CpRead.d ./Core/Src/AC_T/CpRead.o ./Core/Src/AC_T/CpRead.su ./Core/Src/AC_T/EV_StateMachine.cyclo ./Core/Src/AC_T/EV_StateMachine.d ./Core/Src/AC_T/EV_StateMachine.o ./Core/Src/AC_T/EV_StateMachine.su ./Core/Src/AC_T/EV_StateMachine2.cyclo ./Core/Src/AC_T/EV_StateMachine2.d ./Core/Src/AC_T/EV_StateMachine2.o ./Core/Src/AC_T/EV_StateMachine2.su ./Core/Src/AC_T/MCP4725.cyclo ./Core/Src/AC_T/MCP4725.d ./Core/Src/AC_T/MCP4725.o ./Core/Src/AC_T/MCP4725.su ./Core/Src/AC_T/hardwareInterface.cyclo ./Core/Src/AC_T/hardwareInterface.d ./Core/Src/AC_T/hardwareInterface.o ./Core/Src/AC_T/hardwareInterface.su ./Core/Src/AC_T/myHelpers.cyclo ./Core/Src/AC_T/myHelpers.d ./Core/Src/AC_T/myHelpers.o ./Core/Src/AC_T/myHelpers.su ./Core/Src/AC_T/myScheduler.cyclo ./Core/Src/AC_T/myScheduler.d ./Core/Src/AC_T/myScheduler.o ./Core/Src/AC_T/myScheduler.su
 
 .PHONY: clean-Core-2f-Src-2f-AC_T
 

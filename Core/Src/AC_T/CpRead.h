@@ -9,17 +9,7 @@
 #define SRC_AC_T_CPREAD_H_
 
 extern ADC_HandleTypeDef hadc1;
-//DMA_HandleTypeDef hdma_adc1;
-extern TIM_HandleTypeDef htim3; // originally 20kHz, then 40khz, but got aliasing in duty cycle so now non round number
-
-#define ADC_SAMPLE_RATE_x10 384615 //71Pre25 //38919 9Pre184 // 40k 71Pre24 ADC conv started on a 40kHz timer, fed to buf via DMA
-#define EVSE_CP_ADC_BUF_LEN  3846 // 50ms per half //7692 // SampleRate/5, a little less than 100ms per half (99.996ms)
-//7780//8000  // process each half (4000 = 100ms)
-extern uint16_t evse_cp_adc_buffer[EVSE_CP_ADC_BUF_LEN];
-
-// 1475 is -3V
-#define EVSE_CP_RISING_TH 1475 //1875 // = 0.25V actual, value needed for a logic high
-#define EVSE_CP_FALLING_TH 1475 //1875 // 1812 = -0.25V actual, value needed for a logic low
+extern TIM_HandleTypeDef htim3;
 
 
 void AdcInit(void);
@@ -28,33 +18,54 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc);
 
 
 
-extern volatile uint16_t evse_cp_high; // raw adc 12bit value
-extern volatile uint16_t evse_cp_low;
+extern volatile int32_t evse_cp_high_Vx100;
+extern volatile int32_t evse_cp_low_Vx100;
 extern volatile uint32_t evse_cp_duty_x100;
 extern volatile uint32_t evse_cp_freq_x10;
 
-extern volatile int32_t evse_cp_high_Vx100;
-extern volatile int32_t evse_cp_low_Vx100;
 
+extern volatile int32_t ev_cp_high_Vx100;
+extern volatile int32_t ev_cp_low_Vx100;
+extern volatile uint32_t ev_cp_duty_x100;
+extern volatile uint32_t ev_cp_freq_x10;
 
-
-
-/*
+/* First 8 states are same Zerova log
  *
- *  1:state A, 2:State B1, 3:State B2, 4:State C, 5:State D, 6:State E, 7:State F, 8: Pilot error
- *   same as Zerova logs
+ * Updated every cpADCdataProcess(~10ms), debounced_state takes 2 consecutive to update
  *
- *  Updated every cpADCdataProcess(~50ms)
- *
+ * PWM detected indicated by *, otherwise steady DC voltage
  */
-extern volatile uint8_t evse_cp_prev_read_state; //previous 50ms state
+
+typedef enum {           //    EV    |   EVSE    | Plugged In State |  EV State    |  EVSE State
+				   	     //-------------------------------------------------------------------------
+    CP_STATE_A     = 1,  //    0v    |    12v    | Unplugged        |  Not Ready   | Not Ready
+    CP_STATE_B1    = 2,  //    9v    |    9v     | Plugged In       |  Not Ready   | Not Ready
+    CP_STATE_B2    = 3,  //    9v*   |    9v*    | Plugged In       |  Not Ready   | Ready
+    CP_STATE_C     = 4,  //    6v*   |    6v*    | Plugged In       |  Ready       | Ready      -> Charging
+    CP_STATE_D     = 5,  //    3v*   |    3v*    | Plugged In       |  Fault       | Fault
+    CP_STATE_E     = 6,  //    0v    |    0v     | Either           |  Not Ready   | Off
+    CP_STATE_F     = 7,  //  N/A(0v) |   -12v    | Either           |  N/A(state E)| Fault
+    CP_STATE_ERROR = 8,  //   other  |   other   | Either           |  Fault       | Fault
+    CP_STATE_C1  = 9,    //    6v    |    6v     | Plugged In       |  Ready       | Not Ready
+    CP_STATE_A2  = 10,   //    N/A   |   12v*    | Unplugged        |  N/A         | Not Ready
+} cp_state_t;
+
+
+
+
+
 extern volatile uint8_t evse_cp_cur_read_state; //latest 50ms state
 extern volatile uint8_t evse_cp_debounce_read_state; //takes 2 consecutive same state measurements to change
-
-extern volatile uint8_t isPLC; // if powerline comms / ISO15118
+extern volatile uint8_t evse_isPLC; // if powerline comms / ISO15118
 extern volatile uint16_t evse_cp_cur_amp_limit_x100;
 
 
-void processCpADCdata10ms(void); // checks for a flag set every ~100ms
+extern volatile uint8_t ev_cp_cur_read_state; //latest 50ms state
+extern volatile uint8_t ev_cp_debounce_read_state; //takes 2 consecutive same state measurements to change
+extern volatile uint8_t ev_isPLC; // if powerline comms / ISO15118
+extern volatile uint16_t ev_cp_cur_amp_limit_x100;
+
+
+void processCpADCdata1ms(void); // checks for a flag set every ~10ms
 
 #endif /* SRC_AC_T_CPREAD_H_ */

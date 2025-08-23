@@ -5,9 +5,28 @@
 #include "AC_T_globals.h"
 
 
-uint16_t micros() {
-	return __HAL_TIM_GET_COUNTER(&htim2);
+
+volatile uint8_t isMoreThan60Vac_onChargerOut = 0;
+
+volatile uint32_t mainsPulseCount = 0;
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == MAINS_OUT_SENSE_PIN)
+    {
+    	mainsPulseCount++;
+    }
 }
+void process_30ms_isMoreThan60Vac_onChargerOut(void)
+{
+    if (mainsPulseCount >= 1) {
+        isMoreThan60Vac_onChargerOut = 1;
+    }
+    else {
+    	isMoreThan60Vac_onChargerOut = 0;
+    }
+    mainsPulseCount = 0;
+}
+
 
 
 /*
@@ -90,17 +109,13 @@ void MCP4725_DP_DN_setValue(uint16_t value)
 	MCP4725_setValue(&myMCP4725, value, MCP4725_FAST_MODE, MCP4725_POWER_DOWN_OFF);
 }
 
-void MCP4725_DP_DN_setVoltage(float voltage)
-{
-	MCP4725_setVoltage(&myMCP4725, voltage, MCP4725_FAST_MODE, MCP4725_POWER_DOWN_OFF);
-}
 
 
 /*
  * J-1772 relay/MOSFET stuff
  */
 
-volatile uint8_t cp_cur_set_state = 0; //0:idle,1:plugIN(J-1772 state B), 2:C, 3:extEV, 4:F, 5:GND fault, 6:Diode Short
+
 
 const GpioPin cp_gpio_map[CP_NUM_GPIO] = {
     { CP_PLUG_IN_PORT, CP_PLUG_IN_PIN },
@@ -119,12 +134,20 @@ uint8_t cp_gpio_states[CP_NUM_STATES][CP_NUM_GPIO] = {
 	{1, 1, 0, 0, 0}
 };
 
+// does nothing if set to same state, returns 0 if not valid state
+volatile uint8_t cp_cur_set_state = 0; //0:idle,1:plugIN(J-1772 state B), 2:C, 3:extEV, 4:F, 5:GND fault, 6:Diode Short
 uint8_t set_cp_state(uint8_t new_state)
 {
 	if (new_state >= CP_NUM_STATES)
 	{
 		return 0;
 	}
+
+	if (new_state == cp_cur_set_state)
+	{
+		return 1;
+	}
+
 	cp_cur_set_state = new_state;
 
 	for (int i=0; i < 5; i++) {

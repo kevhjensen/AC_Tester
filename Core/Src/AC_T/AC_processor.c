@@ -17,8 +17,10 @@ volatile float CT_phase_us_offset = 0;
 
 uint8_t update_CT_mA_setpoint(int32_t new_mA_setpoint) // may need to add limits, negative value means flowing into charger
 {
+	if (new_mA_setpoint == 0) {
+		CT_mA_rms_setpoint = 0;
+	}
 	CT_mA_rms_setpoint = new_mA_setpoint;
-	CT_A_rms_setpoint = (float)CT_mA_rms_setpoint / 1000.0f;
 	return 1;
 }
 
@@ -45,12 +47,14 @@ uint8_t update_CT_phase_us_offset(int32_t new_CT_phase_us_offset) // may need to
 
 int32_t V_buf1[AC_BUFFER_SIZE]; // raw values
 int32_t V_buf2[AC_BUFFER_SIZE]; //write to a buffer while process the other one
-int32_t I_buf1[AC_BUFFER_SIZE];
-int32_t I_buf2[AC_BUFFER_SIZE];
 
-float I_buf1_emul[AC_BUFFER_SIZE]; // scaled to actual Amps
-float I_buf2_emul[AC_BUFFER_SIZE];
 
+float I_buf1[AC_BUFFER_SIZE]; // scaled to actual Amps
+float I_buf2[AC_BUFFER_SIZE];
+
+
+int32_t ref_V_buf[AC_BUFFER_SIZE];
+float ref_ZC_times_buf[NUM_CYCLES + 1];
 
 volatile uint8_t sense_mode = 0;  //0 for emulate mode, 1 for sense mode (read 2ch)
 uint8_t update_Sense_Mode(uint8_t new_sense_mode)
@@ -67,8 +71,6 @@ uint8_t update_Sense_Mode(uint8_t new_sense_mode)
 	memset(I_buf1, 0, sizeof(I_buf1));
 	memset(I_buf2, 0, sizeof(I_buf2));
 
-	memset(I_buf1_emul, 0, sizeof(I_buf1_emul));
-	memset(I_buf2_emul, 0, sizeof(I_buf2_emul));
 
 	AC_EnergyRegister_Wh = 0;
 	CT_mA_rms_setpoint = 0;
@@ -117,8 +119,7 @@ volatile uint8_t V_buf_to_process_zc_count = 0;
 volatile AC_Results_float cur_AC_data = {0};
 volatile float AC_EnergyRegister_Wh = 0;
 
-int32_t ref_V_buf[AC_BUFFER_SIZE];
-float ref_ZC_times_buf[NUM_CYCLES + 1];
+
 
 
 
@@ -157,7 +158,7 @@ float emulateCT_Signal(int32_t sample, uint32_t timeElapsed) // timeElapsed sinc
 	float timeSinceRefBufferStart;
 	float refV = 0; // raw voltage, scale to get current out
 
-	if (CT_A_rms_setpoint == 0.0f || cur_AC_data.zc_count < NUM_CYCLES || cur_AC_data.VrmsRaw == 0.0f)
+	if (CT_mA_rms_setpoint == 0 || cur_AC_data.zc_count < NUM_CYCLES || cur_AC_data.VrmsRaw < 10.0f)
 	{
 		MCP4725_DP_DN_setValue(2048); // 0 current
 		return 0.0f;
@@ -174,7 +175,7 @@ float emulateCT_Signal(int32_t sample, uint32_t timeElapsed) // timeElapsed sinc
 	refV = interpolate_v_at_time(ref_V_buf, cur_AC_data.SampleNum, cur_AC_data.avgSampleTime, timeSinceRefBufferStart);
 
 
-	float CT_A = CT_A_rms_setpoint * (refV / cur_AC_data.VrmsRaw); // (~ -1.41 to 1.41 range) magnitude relative to RMS
+	float CT_A = ((float)CT_mA_rms_setpoint/1000) * (refV / cur_AC_data.VrmsRaw); // (~ -1.41 to 1.41 range) magnitude relative to RMS
 
 	uint16_t value = MCP_DP_DN_Value_from_A_setpoint(CT_A); // TO DO: recompute CT_A for actual output
 	MCP4725_DP_DN_setValue(value);
@@ -201,7 +202,7 @@ void bufferFull(int32_t dupSample, float dupCurrent) // switch V_buf_to_write, s
 		V_buf_to_write = 2;
 
 		V_buf2_head = 0; // reset new write buffer
-		I_buf2_emul[V_buf2_head] = dupCurrent;
+		I_buf2[V_buf2_head] = dupCurrent;
 		V_buf2[V_buf2_head++] = dupSample; // start with duplicate post zc value
 
 		ZC_times_buf2[0] = ZC_times_buf1[NUM_CYCLES] - (float)to_process_time; // negative value
@@ -212,7 +213,7 @@ void bufferFull(int32_t dupSample, float dupCurrent) // switch V_buf_to_write, s
 		V_buf_to_write = 1;
 
 		V_buf1_head = 0;
-		I_buf1_emul[V_buf1_head] = dupCurrent;
+		I_buf1[V_buf1_head] = dupCurrent;
 		V_buf1[V_buf1_head++] = dupSample;
 
 		ZC_times_buf1[0] = ZC_times_buf2[NUM_CYCLES] - (float)to_process_time;
@@ -298,7 +299,8 @@ void new_ADS_AC_V_sample(int32_t sample, uint16_t sampleTime) // ADS1220 interru
     {
         if (V_buf1_head < AC_BUFFER_SIZE)
         {
-        	I_buf1_emul[V_buf1_head] = last_CT_emulate_A;
+        	if (sense_mode == 0)
+        		I_buf1[V_buf1_head] = last_CT_emulate_A;
             V_buf1[V_buf1_head++] = sample; // write to head index then increment
         }
         else
@@ -310,7 +312,8 @@ void new_ADS_AC_V_sample(int32_t sample, uint16_t sampleTime) // ADS1220 interru
     {
         if (V_buf1_head < AC_BUFFER_SIZE)
         {
-        	I_buf2_emul[V_buf2_head] = last_CT_emulate_A;
+        	if (sense_mode == 0)
+        		I_buf2[V_buf2_head] = last_CT_emulate_A;
             V_buf2[V_buf2_head++] = sample; // write to head index then increment
         }
         else
@@ -342,13 +345,13 @@ void new_ADS_AC_I_sample(int32_t sample, uint16_t sampleTime) // handles I curre
 	if (V_buf_to_write == 1)
 	{
 		if (V_buf1_head > 0 && V_buf1_head - 1 < AC_BUFFER_SIZE) {
-			I_buf1[V_buf1_head - 1] = interpolated_I; // align with latest V
+			I_buf1[V_buf1_head - 1] = AC_I_from_raw(interpolated_I); // align with latest V
 		}
 	}
 	else
 	{
 		if (V_buf2_head > 0 && V_buf2_head - 1 < AC_BUFFER_SIZE) {
-			I_buf2[V_buf2_head - 1] = interpolated_I; // align with latest V
+			I_buf2[V_buf2_head - 1] = AC_I_from_raw(interpolated_I); // align with latest V
 		}
 	}
 
@@ -358,75 +361,7 @@ void new_ADS_AC_I_sample(int32_t sample, uint16_t sampleTime) // handles I curre
 
 }
 
-
 void analyze_AC_waveform(int32_t* V_buf,
-							 int32_t* I_buf,
-							 uint16_t N,
-							 uint8_t zc_count,
-							 uint32_t duration_us,
-							 float* zc_buf)
-{
-    uint64_t Vsq_sum = 0;
-    uint64_t Isq_sum = 0;
-    int64_t  Psum_i64    = 0;
-
-    for (uint16_t i = 0; i < N; i++) {
-        int32_t V = V_buf[i];
-        int32_t I = I_buf[i];
-
-        Vsq_sum += (uint64_t)((int64_t)V * (int64_t)V);
-        Isq_sum += (uint64_t)((int64_t)I * (int64_t)I);
-        Psum_i64    += (int64_t)V * (int64_t)I;
-
-    }
-
-    // Convert to float only at the final step
-    float invN = (N > 0) ? (1.0f / (float)N) : 0.0f;
-
-    float VrmsRaw = sqrtf((float)Vsq_sum * invN);
-    float IrmsRaw = sqrtf((float)Isq_sum * invN);
-
-    float Vrms = AC_V_from_raw(VrmsRaw);
-    float Irms = AC_I_from_raw(IrmsRaw);
-    float RealPower = AC_I_from_raw(AC_V_from_raw((float)Psum_i64 * invN));
-    float ApparentPower = Vrms * Irms;
-
-    AC_EnergyRegister_Wh += (RealPower * (float)duration_us) / 3600000000.0f;
-
-    float PF = 0.0f;
-    if (ApparentPower != 0.0f) {
-        PF = RealPower / ApparentPower;
-    }
-    float freq = 0.0f;
-    if (zc_count < 1 || duration_us == 0)
-    	freq = 0.0f;
-    else
-    	freq = ((float)zc_count * 1.0e6f) / (zc_buf[zc_count] - zc_buf[0]);
-
-    float avgSampleTime = (float)duration_us * invN;
-
-    // Populate results
-    cur_AC_data.Vrms          = Vrms;
-    cur_AC_data.Irms          = Irms;
-    cur_AC_data.RealPower_W     = RealPower;
-    cur_AC_data.ApparentPower_W = ApparentPower;
-
-    cur_AC_data.VrmsRaw       = VrmsRaw;
-    cur_AC_data.Vsq_sum_raw       = Vsq_sum;
-    cur_AC_data.Isq_sum_raw       = Isq_sum;
-
-    cur_AC_data.SampleNum     = N;
-    cur_AC_data.Duration_us   = duration_us;
-
-    cur_AC_data.PF            = PF;
-    cur_AC_data.Frequency_Hz  = freq;
-
-	cur_AC_data.avgSampleTime = avgSampleTime;
-	cur_AC_data.zc_count = zc_count;
-
-}
-
-void analyze_AC_waveform_emulate(int32_t* V_buf,
 							 float* I_buf,
 							 uint16_t N,
 							 uint8_t zc_count,
@@ -456,7 +391,7 @@ void analyze_AC_waveform_emulate(int32_t* V_buf,
     float Irms = sqrtf((float)Isq_sum * invN);
 
     float Vrms = AC_V_from_raw(VrmsRaw);
-    // float Irms = AC_I_from_raw(IrmsRaw);
+
     float RealPower = AC_V_from_raw(Psum * invN);
     float ApparentPower = Vrms * Irms;
 
@@ -514,63 +449,49 @@ void processACdata10ms(void) // run this task faster than AC_CYCLE_NUMBER * AC m
 	buf_rdy_to_process = 0;
 
 	if (V_buf_to_write == 2) {
-		if (sense_mode == 0) {
-			analyze_AC_waveform_emulate(V_buf1, I_buf1_emul, V_buf1_head - 1, V_buf_to_process_zc_count, to_process_time, ZC_times_buf1);
-		}
-		else {
-			analyze_AC_waveform(V_buf1, I_buf1, V_buf1_head - 1, V_buf_to_process_zc_count, to_process_time, ZC_times_buf1);
-		}
+		analyze_AC_waveform(V_buf1, I_buf1, V_buf1_head - 1, V_buf_to_process_zc_count, to_process_time, ZC_times_buf1);
 	}
 	else {
-		if (sense_mode == 0) {
-			analyze_AC_waveform_emulate(V_buf2, I_buf2_emul, V_buf2_head - 1, V_buf_to_process_zc_count, to_process_time, ZC_times_buf2);
-		}
-		else {
-			analyze_AC_waveform(V_buf2, I_buf2, V_buf2_head - 1, V_buf_to_process_zc_count, to_process_time, ZC_times_buf2);
-		}
-	}
-	snprintf(buf, sizeof(buf),
-	         "%lu, %.3f, %.3f, %.3f, %.3f, %.3f, %.3f\r\n",
-	         HAL_GetTick(),
-	         cur_AC_data.Vrms,           // Vrms in volts
-	         cur_AC_data.Irms,           // Irms in amps
-	         cur_AC_data.RealPower_W/1000.0f,      // kWs
-
-	         cur_AC_data.PF,             // Power Factor
-			 cur_AC_data.Frequency_Hz,
-	         AC_EnergyRegister_Wh
-	);
-
-
-	if (data_mode == 7 || data_mode == 8) {
-		CDC_Transmit_FS((uint8_t*)buf, strlen(buf));
+		analyze_AC_waveform(V_buf2, I_buf2, V_buf2_head - 1, V_buf_to_process_zc_count, to_process_time, ZC_times_buf2);
 	}
 
-	if (data_mode == 10 && V_buf_to_write == 1) {
+
+	if (data_mode == 6 || data_mode == 7) {
+		snprintf(buf, sizeof(buf),
+		         "AC %.3f, %.3f, %.3f, %.3f, %.2f, %.4f",
+		         cur_AC_data.Vrms,           // Vrms in volts
+		         cur_AC_data.Irms,           // Irms in amps
+		         cur_AC_data.RealPower_W/1000.0f,      // kWs
+		         cur_AC_data.PF,             // Power Factor
+				 cur_AC_data.Frequency_Hz,
+		         AC_EnergyRegister_Wh/1000.0f
+		);
+		addToMsgQ(buf);
+	}
+
+	if (data_mode == 101 && V_buf_to_write == 1) {
 
 		for (uint16_t i=0; i<V_buf2_head - 1; i++) {
 			snprintf(buf, sizeof(buf),
-			         "%u, %.3f, %.3f, %.3f\r\n",
+			         "%u, %.3f, %.3f",
 			         i,
 					 AC_V_from_raw(V_buf2[i]),
-					 I_buf2_emul[i],
-					 AC_I_from_raw(I_buf2[i])
+					 I_buf2[i]
 
 			);
-			CDC_Transmit_FS((uint8_t*)buf, strlen(buf));
+			addToMsgQ(buf);
 		}
 	}
-	if (data_mode == 10 && V_buf_to_write == 2) {
+	if (data_mode == 101 && V_buf_to_write == 2) {
 
 			for (uint16_t i=0; i<V_buf1_head - 1; i++) {
 				snprintf(buf, sizeof(buf),
-				         "%u, %.3f, %.3f, %.3f\r\n",
+				         "%u, %.3f, %.3f",
 				         i,
 						 AC_V_from_raw(V_buf1[i]),
-						 I_buf1_emul[i],
-						 AC_I_from_raw(I_buf1[i])
+						 I_buf1[i]
 				);
-				CDC_Transmit_FS((uint8_t*)buf, strlen(buf));
+				addToMsgQ(buf);
 			}
 		}
 }
